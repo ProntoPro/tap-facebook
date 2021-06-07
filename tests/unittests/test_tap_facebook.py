@@ -1,44 +1,68 @@
 import itertools
 import unittest
+from unittest.mock import patch
 import pendulum
 import tap_facebook
 
 from tap_facebook import AdsInsights
 from singer.catalog import Catalog, CatalogEntry
 from singer.schema import Schema
-from singer.utils import strftime
+from singer.utils import strftime, parse_args
+from singer import SingerDiscoveryError, SingerSyncError
 
 class TestAdsInsights(unittest.TestCase):
-
-    def test_insights_start_dates(self):
+    fake_catalog_entry = CatalogEntry(schema={'properties': {'something': {'type': 'object'}}},
+                                       metadata=[{'breadcrumb': ('properties', 'something'),
+                                                  'metadata': {'selected' : True}}])
+    def test_insights_start_dates_adjust_if_outside_window(self):
         insights = AdsInsights(
             name='insights',
             account=None,
             stream_alias="insights",
             options={},
-            catalog_entry=CatalogEntry(schema={'properties': {'something': {'type': 'object'}}},
-                                       metadata=[{'breadcrumb': ('properties', 'something'),
-                                                  'metadata': {'selected' : True}}]),
+            catalog_entry=self.fake_catalog_entry,
             state={'bookmarks':{'insights': {'date_start': '2017-01-31'}}})
         params = list(itertools.islice(insights.job_params(), 5))
+        expected_date = pendulum.today().subtract(months=AdsInsights.FACEBOOK_INSIGHTS_RETENTION_PERIOD)
         self.assertEqual(params[0]['time_ranges'],
-                         [{'since': '2017-01-03',
-                           'until': '2017-01-03'}])
+                         [{'since': expected_date.to_date_string(),
+                           'until': expected_date.to_date_string()}])
 
+        expected_date = expected_date.add(days=4)
         self.assertEqual(params[4]['time_ranges'],
-                         [{'since': '2017-01-07',
-                           'until': '2017-01-07'}])
+                         [{'since': expected_date.to_date_string(),
+                           'until': expected_date.to_date_string()}])
 
-    def test_insights_job_params_stops(self):
-        start_date = tap_facebook.TODAY.subtract(days=2)
+    def test_insights_start_dates_adjust_if_inside_window(self):
+        input_date = pendulum.today().subtract(months=1)
+        expected_date = input_date.subtract(days=28)
         insights = AdsInsights(
             name='insights',
             account=None,
             stream_alias="insights",
             options={},
-            catalog_entry=CatalogEntry(schema={'properties': {'something': {'type': 'object'}}},
-                                       metadata=[{'breadcrumb': ('properties', 'something'),
-                                                  'metadata': {'selected' : True}}]),
+            catalog_entry=self.fake_catalog_entry,
+            state={'bookmarks':{'insights': {'date_start': input_date.to_date_string()}}})
+        params = list(itertools.islice(insights.job_params(), 5))
+
+
+        self.assertEqual(params[0]['time_ranges'],
+                         [{'since': expected_date.to_date_string(),
+                           'until': expected_date.to_date_string()}])
+
+        expected_date = expected_date.add(days=4)
+        self.assertEqual(params[4]['time_ranges'],
+                         [{'since': expected_date.to_date_string(),
+                           'until': expected_date.to_date_string()}])
+
+    def test_insights_job_params_stops(self):
+        start_date = pendulum.today().subtract(days=2)
+        insights = AdsInsights(
+            name='insights',
+            account=None,
+            stream_alias="insights",
+            options={},
+            catalog_entry=self.fake_catalog_entry,
             state={'bookmarks':{'insights': {'date_start': start_date.to_date_string()}}})
 
         self.assertEqual(31, len(list(insights.job_params())))
@@ -93,6 +117,43 @@ class TestDateTimeParsing(unittest.TestCase):
         self.assertEqual(
             tap_facebook.transform_datetime_string(dt),
             expected)
+
+
+def fake_args(is_discovery):
+    from collections import namedtuple
+    fake_args = namedtuple('args', 'config discover properties state')
+
+    def wrapped_function(*args, **kwargs):
+        return fake_args({'account_id': 123,
+                          'access_token': 123},
+                         is_discovery,
+                         {'streams': []},
+                         {})
+
+    return wrapped_function
+
+def get_fake_accounts(*args, **kwargs):
+    return [{'account_id': 123}]
+
+def fake_tap_run(*args, **kwargs):
+    raise tap_facebook.FacebookError('this is a test')
+
+class TestErrorHandling(unittest.TestCase):
+
+    @patch('singer.utils.parse_args', fake_args(is_discovery=True))
+    @patch('facebook_business.adobjects.user.User.get_ad_accounts', get_fake_accounts)
+    @patch('tap_facebook.do_discover', fake_tap_run)
+    def test_discovery(self):
+        with self.assertRaises(SingerDiscoveryError):
+            tap_facebook.main()
+
+    @patch('singer.utils.parse_args', fake_args(is_discovery=False))
+    @patch('facebook_business.adobjects.user.User.get_ad_accounts', get_fake_accounts)
+    @patch('tap_facebook.do_sync', fake_tap_run)
+    def test_sync(self):
+        with self.assertRaises(SingerSyncError):
+            tap_facebook.main()
+
 
 
 if __name__ == '__main__':
