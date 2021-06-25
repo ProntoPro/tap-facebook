@@ -1,5 +1,46 @@
 # Changelog
 
+# 1.14.0
+  * Add an Ads Insight Stream, broken down by `hourly_stats_aggregated_by_advertiser_time_zone` [#151](https://github.com/singer-io/tap-facebook/pull/151)
+
+# 1.13.0
+  * Bump API version from `v9` to `v10` [#146](https://github.com/singer-io/tap-facebook/pull/146)
+  * Add feature for AdsInsights stream: The tap will shift the start date to 37 months ago in order to fetch data from this API
+    * More info [here](https://www.facebook.com/business/help/1695754927158071?id=354406972049255)
+
+# 1.12.1
+  * Increased insights job timeout to 300 seconds [#148](https://github.com/singer-io/tap-facebook/pull/148)
+
+# 1.12.0
+  * Added leads stream [#143](https://github.com/singer-io/tap-facebook/pull/143)
+
+# 1.11.2
+  * Added unique_outbound_clicks to several streams [#138](https://github.com/singer-io/tap-facebook/pull/138)
+
+## 1.11.1
+  * Modifies the way FacebookRequestError is parsed [#135](https://github.com/singer-io/tap-facebook/pull/135)
+
+## 1.11.0
+  * Upgrades facebook_business library to version 9.0.0 [#133](https://github.com/singer-io/tap-facebook/pull/133)
+
+## 1.10.0
+  * Add consistent logging for `facebook_business.exceptions.FacebookError` errors [#129](https://github.com/singer-io/tap-facebook/pull/129)
+
+## 1.9.7
+  * Add check for `TypeError` and retry them on the `AdsInsights` and `AdCreative` streams [#126](https://github.com/singer-io/tap-facebook/pull/126)
+
+## 1.9.6
+  * Add check for `FacebookBadObjectError` and retry them on the `AdsInsights` stream [#124](https://github.com/singer-io/tap-facebook/pull/124)
+
+## 1.9.5
+  * Add check for `HTTP 500` and retry them on the `AdCreatives` stream [#121](https://github.com/singer-io/tap-facebook/pull/121)
+
+## 1.9.4
+  * Bump SDK version to get bug fixes [#105](https://github.com/singer-io/tap-facebook/pull/105)
+
+## 1.9.3
+  * Bump API version from `v6` to `v8` [#103](https://github.com/singer-io/tap-facebook/pull/103)
+
 ## 1.9.2
   * Fix retry pattern for non-insights incremental streams [#100](https://github.com/singer-io/tap-facebook/pull/100)
   * Remove workaround implemented in [#55](https://github.com/singer-io/tap-facebook/pull/55)
